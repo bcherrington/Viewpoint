@@ -34,13 +34,6 @@ module Viewpoint::EWS::Types
       reminder_is_set?:   [:reminder_is_set, :text],
       calendar_item_type:   [:calendar_item_type, :text],
       modified_occurrences: [:modified_occurrences, :elems ],
-      reminder_due_by: [:reminder_due_by, :text],
-      reminder_minutes_before_start: [:reminder_minutes_before_start, :text],
-      reminder_is_set?:   [:reminder_is_set, :text],
-      is_draft?:   [:is_draft, :text],
-      is_from_me?:   [:is_from_me, :text],
-      is_unmodified?:   [:is_unmodified, :text],
-      calendar_item_type:   [:calendar_item_type, :text]
    }
 
     CALENDAR_ITEM_KEY_TYPES = {
