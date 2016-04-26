@@ -48,14 +48,11 @@ module Viewpoint::EWS::SOAP
       @response_messages = []
       response_type = response.keys.first
       response[response_type][:response_messages].each do |full_response_message, rm|
-        # pp full_response_message
         if full_response_message.is_a?(Hash)
           response_message_type, rm = full_response_message.first
         else
           response_message_type = full_response_message
         end
-        # pp response_message_type
-        # pp rm
         rm_klass = class_by_name(response_message_type)
         @response_messages << rm_klass.new({response_message_type => rm})
       end
