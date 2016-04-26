@@ -185,7 +185,7 @@ module Viewpoint::EWS::SOAP
         }
       }
     end
-    
+
     # Build the FieldOrder element
     # @see http://msdn.microsoft.com/en-us/library/office/aa564968(v=exchg.150).aspx
     # @todo needs peer check
@@ -198,7 +198,7 @@ module Viewpoint::EWS::SOAP
         }
       }
     end
-    
+
     # Build the BaseShape element
     # @see http://msdn.microsoft.com/en-us/library/aa580545.aspx
     def base_shape!(base_shape)
@@ -391,115 +391,10 @@ module Viewpoint::EWS::SOAP
       nbuild[NS_EWS_TYPES].DisplayName(name[:text])
     end
 
-    def given_name!(name)
-      nbuild[NS_EWS_TYPES].GivenName(name)
-    end
-
-    def initials!(name)
-      nbuild[NS_EWS_TYPES].Initials(name)
-    end
-
-    def middle_name!(name)
-      nbuild[NS_EWS_TYPES].MiddleName(name)
-    end
-
-    def company_name!(name)
-      nbuild[NS_EWS_TYPES].CompanyName(name)
-    end
-
-    def assistant_name!(name)
-      nbuild[NS_EWS_TYPES].AssistantName(name)
-    end
-
-    def birthday!(name)
-      nbuild[NS_EWS_TYPES].Birthday(name)
-    end
-
-    def business_home_page!(name)
-      nbuild[NS_EWS_TYPES].BusinessHomePage(name)
-    end
-
-    def department!(name)
-      nbuild[NS_EWS_TYPES].Department(name)
-    end
-
-    def generation!(name)
-      nbuild[NS_EWS_TYPES].Generation(name)
-    end
-
-    def nickname!(name)
-      nbuild[NS_EWS_TYPES].Nickname(name)
-    end
-
-    def job_title!(name)
-      nbuild[NS_EWS_TYPES].JobTitle(name)
-    end
-
-    def manager!(name)
-      nbuild[NS_EWS_TYPES].Manager(name)
-    end
-
-    def mileage!(name)
-      nbuild[NS_EWS_TYPES].Mileage(name)
-    end
-
-    def office_location!(name)
-      nbuild[NS_EWS_TYPES].OfficeLocation(name)
-    end
-
-    def profession!(name)
-      nbuild[NS_EWS_TYPES].Profession(name)
-    end
-
-    def spouse_name!(name)
-      nbuild[NS_EWS_TYPES].SpouseName(name)
-    end
-
-    def surname!(name)
-      nbuild[NS_EWS_TYPES].Surname(name)
-    end
-
-    def file_as!(name)
-      nbuild[NS_EWS_TYPES].FileAs(name)
-    end
-
-    def file_as_mapping!(name)
-      nbuild[NS_EWS_TYPES].FileAsMapping(name)
-    end
-
-    def wedding_anniversary!(name)
-      nbuild[NS_EWS_TYPES].WeddingAnniversary(name)
-    end
-
-    def phonetic_full_name!(name)
-      nbuild[NS_EWS_TYPES].PhoneticFullName(name)
-    end
-
-    def phonetic_first_name!(name)
-      nbuild[NS_EWS_TYPES].PhoneticFirstName(name)
-    end
-
-    def phonetic_last_name!(name)
-      nbuild[NS_EWS_TYPES].PhoneticLastName(name)
-    end
-
-    def alias!(name)
-      nbuild[NS_EWS_TYPES].Alias(name)
-    end
-
-    def notes!(name)
-      nbuild[NS_EWS_TYPES].Notes(name)
-    end
-
-    def children!(names)
-      nbuild[NS_EWS_TYPES].Children{
-        names.each{|name|nbuild[NS_EWS_TYPES].String(name)}
-      }
-    end
-
+    # @see http://msdn.microsoft.com/en-us/library/aa565683(v=exchg.140).aspx
     def categories!(names)
       nbuild[NS_EWS_TYPES].Categories{
-        names.each{|name|nbuild[NS_EWS_TYPES].String(name)}
+        names.each{|name|nbuild[NS_EWS_TYPES].String(name[:string][:text])}
       }
     end
 
@@ -509,60 +404,12 @@ module Viewpoint::EWS::SOAP
       }
     end
 
-    def email_addresses!(addresses)
-      nbuild[NS_EWS_TYPES].EmailAddresses {
-        addresses.each do |address|
-          attrs = {Key: address[:key]}
-          attrs[:Name] = address[:name] if address[:name] && address[:name] != ''
-          attrs[:RoutingType] = address[:routing_type] if address[:routing_type] && address[:routing_type] != ''
-          attrs[:MailboxType] = address[:mailbox_type] if address[:mailbox_type] && address[:mailbox_type] != ''
-          nbuild[NS_EWS_TYPES].Entry(attrs) {
-            nbuild.text address[:text]
-          }
-        end
-      }
-    end
-
-    def physical_addresses!(addresses)
-      nbuild[NS_EWS_TYPES].PhysicalAddresses {
-        addresses.each do |address|
-          nbuild[NS_EWS_TYPES].Entry(Key: address[:key]) {
-            nbuild[NS_EWS_TYPES].Street(address[:street])
-            nbuild[NS_EWS_TYPES].City(address[:city])
-            nbuild[NS_EWS_TYPES].State(address[:state])
-            nbuild[NS_EWS_TYPES].CountryOrRegion(address[:country_or_region])
-            nbuild[NS_EWS_TYPES].PostalCode(address[:postal_code])
-          }
-        end
-      }
-    end
-
-    def im_addresses!(addresses)
-      nbuild[NS_EWS_TYPES].ImAddresses {
-        addresses.each do |address|
-          nbuild[NS_EWS_TYPES].Entry(Key: address[:key]) {
-            nbuild.text address[:text]
-          }
-        end
-      }
-    end
-
-    def phone_numbers!(numbers)
-      nbuild[NS_EWS_TYPES].PhoneNumbers {
-        numbers.each do |number|
-          nbuild[NS_EWS_TYPES].Entry(Key: number[:key]) {
-            nbuild.text number[:text]
-          }
-        end
-      }
-    end
-
     # Build the AdditionalProperties element
     # @see http://msdn.microsoft.com/en-us/library/aa563810.aspx
     def additional_properties!(addprops)
       @nbuild[NS_EWS_TYPES].AdditionalProperties {
-        addprops.each_pair {|k,v|
-          dispatch_field_uri!({k => v}, NS_EWS_TYPES)
+        addprops.each {|v|
+          dispatch_field_uri!(v, NS_EWS_TYPES)
         }
       }
     end
@@ -827,7 +674,9 @@ module Viewpoint::EWS::SOAP
       restriction_compare('IsNotEqualTo',expr)
     end
 
-    def restriction_compare(type,expr)
+    def restriction_compare(type, expr)
+      expr = [expr] unless expr.is_a? Array
+
       nbuild[NS_EWS_TYPES].send(type) {
         expr.each do |e|
           e.each_pair do |k,v|
@@ -891,7 +740,7 @@ module Viewpoint::EWS::SOAP
     end
 
     def value!(val)
-      nbuild[NS_EWS_TYPES].Value(val)
+      nbuild[NS_EWS_TYPES].Value(val[:text])
     end
 
     def field_uRI_or_constant(expr)
@@ -1043,9 +892,9 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa581315(v=exchg.140).aspx
     def contact!(item)
       nbuild[NS_EWS_TYPES].Contact {
-        item.each_pair {|k,v|
-          r =self.send("#{k}!", v)
-        }        
+        item.each_pair do |k,v|
+          r = self.send("#{k}!", v)
+        end
       }
     end
 
@@ -1167,22 +1016,6 @@ module Viewpoint::EWS::SOAP
     def task!(item)
       nbuild[NS_EWS_TYPES].Task {
         item.each_pair {|k, v|
-          self.send("#{k}!", v)
-        }
-      }
-    end
-
-    def contact!(item)
-      nbuild[NS_EWS_TYPES].Contact {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
-      }
-    end
-
-    def contact!(item)
-      nbuild[NS_EWS_TYPES].Contact {
-        item.each_pair {|k,v|
           self.send("#{k}!", v)
         }
       }
@@ -1322,20 +1155,20 @@ module Viewpoint::EWS::SOAP
    <ManagerMailbox/>
    <DirectReports/>
 =end
-  
+
     # @see http://msdn.microsoft.com/en-us/library/aa565861(v=exchg.140).aspx
     def file_as!(f)
-      nbuild[NS_EWS_TYPES].FileAs(f[:text])      
+      nbuild[NS_EWS_TYPES].FileAs(f[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa579712(v=exchg.140).aspx
     def file_as_mapping!(f)
       nbuild[NS_EWS_TYPES].FileAsMapping(f[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa581108(v=exchg.140).aspx
     def company_name!(c)
-      nbuild[NS_EWS_TYPES].CompanyName(c[:text])      
+      nbuild[NS_EWS_TYPES].CompanyName(c[:text])
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa566451(v=exchg.140).aspx
@@ -1348,12 +1181,34 @@ module Viewpoint::EWS::SOAP
         end
       }
     end
-    
+
     def emailaddress!(e)
-      nbuild[NS_EWS_TYPES].Entry("Key" => e[:key]) { 
+      nbuild[NS_EWS_TYPES].Entry("Key" => e[:key]) {
         nbuild.text(e[:text])
       }
     end
+
+    # @see ?
+    def physical_addresses!(p)
+      nbuild[NS_EWS_TYPES].PhysicalAddresses {
+        if p.is_a?(Hash)
+          physicaladdress!(p[:entry])
+        else
+          p.each {|address| physicaladdress!(address[:entry]) }
+        end
+      }
+    end
+
+    def physicaladdress!(p)
+      nbuild[NS_EWS_TYPES].Entry("Key" => p[:key]) {
+        nbuild[NS_EWS_TYPES].Street(p[:street][:text])
+        nbuild[NS_EWS_TYPES].City(p[:city][:text])
+        nbuild[NS_EWS_TYPES].State(p[:state][:text])
+        nbuild[NS_EWS_TYPES].CountryOrRegion(p[:country_or_region][:text])
+        nbuild[NS_EWS_TYPES].PostalCode(p[:postal_code][:text])
+      }
+    end
+
 
     # @see http://msdn.microsoft.com/en-us/library/aa563540(v=exchg.140).aspx
     def phone_numbers!(p)
@@ -1365,13 +1220,21 @@ module Viewpoint::EWS::SOAP
         end
       }
     end
-    
+
     def phonenumbers!(p)
-      nbuild[NS_EWS_TYPES].Entry("Key" => p[:key]) { 
+      nbuild[NS_EWS_TYPES].Entry("Key" => p[:key]) {
         nbuild.text(p[:text])
       }
     end
-    
+
+    def assistant_name!(an)
+      nbuild[NS_EWS_TYPES].AssistantName(an[:text])
+    end
+
+    def birthday!(b)
+      nbuild[NS_EWS_TYPES].Birthday(b[:text])
+    end
+
     # @see http://msdn.microsoft.com/en-us/library/aa579679(v=exchg.140).aspx
     def im_addresses!(d)
       nbuild[NS_EWS_TYPES].ImAddresses {
@@ -1382,94 +1245,117 @@ module Viewpoint::EWS::SOAP
         end
       }
     end
-    
+
     def imaddresses!(d)
-      nbuild[NS_EWS_TYPES].Entry("Key" => d[:key]) { 
+      nbuild[NS_EWS_TYPES].Entry("Key" => d[:key]) {
         nbuild.text(d[:text])
       }
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa580954(v=exchg.140).aspx
     def job_title!(j)
-      nbuild[NS_EWS_TYPES].JobTitle(j[:text])      
-    end    
-     
+      nbuild[NS_EWS_TYPES].JobTitle(j[:text])
+    end
+
+    def manager!(m)
+      nbuild[NS_EWS_TYPES].Manager(m[:text])
+    end
+
     # Readonly - exclude from building
     def complete_name!(n)
     end
-    
+
     def display_cc!(n)
     end
-    
+
     def display_to!(n)
-    end     
-    
+    end
+
     def web_client_read_form_query_string!(d)
     end
 
     def web_client_edit_form_query_string!(d)
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa565687(v=exchg.140).aspx
     def sensitivity!(s)
       nbuild[NS_EWS_TYPES].Sensitivity(s[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa563467(v=exchg.140).aspx
     # def importance!(i)
       # nbuild[NS_EWS_TYPES].Importance(i[:text])
     # end
-        
+
     # @SEE http://msdn.microsoft.com/en-us/library/dd899429(v=exchg.140).aspx
     # Read-only
     def is_associated!(a)
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/dd899527(v=exchg.140).aspx
     # Read-only
     def conversation_id!(c)
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa564015(v=exchg.140).aspx
     def given_name!(g)
       nbuild[NS_EWS_TYPES].GivenName(g[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa563542(v=exchg.140).aspx
     def initials!(i)
       nbuild[NS_EWS_TYPES].Initials(i[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa579549(v=exchg.140).aspx
     def middle_name!(m)
       nbuild[NS_EWS_TYPES].MiddleName(m[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa580472(v=exchg.140).aspx
     def nickname!(n)
       nbuild[NS_EWS_TYPES].Nickname(n[:text])
     end
-    
+
+    def postal_address_index!(pai)
+      nbuild[NS_EWS_TYPES].PostalAddressIndex(pai[:text])
+    end
+
+    def profession!(s)
+      nbuild[NS_EWS_TYPES].Profession(s[:text])
+    end
+
+    def office_location!(s)
+      nbuild[NS_EWS_TYPES].OfficeLocation(s[:text])
+    end
+
+    def spouse_name!(s)
+      nbuild[NS_EWS_TYPES].SpouseName(s[:text])
+    end
+
     # @see http://msdn.microsoft.com/en-us/library/aa563736(v=exchg.140).aspx
     def surname!(s)
       nbuild[NS_EWS_TYPES].Surname(s[:text])
     end
-    
+
+    def business_home_page!(d)
+      nbuild[NS_EWS_TYPES].BusinessHomePage(d[:text])
+    end
+
+    def wedding_anniversary!(d)
+      nbuild[NS_EWS_TYPES].WeddingAnniversary(d[:text])
+    end
+
     # @see http://msdn.microsoft.com/en-us/library/aa494082(v=exchg.140).aspx
     def department!(d)
       nbuild[NS_EWS_TYPES].Department(d[:text])
     end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa564513(v=exchg.140).aspx
     def generation!(g)
       nbuild[NS_EWS_TYPES].Generation(g[:text])
     end
-    
-    # @see http://msdn.microsoft.com/en-us/library/aa565683(v=exchg.140).aspx
-    def categories!(c)
-      
-    end
-    
+
     # @see http://msdn.microsoft.com/en-us/library/aa563719(v=exchg.140).aspx
     # @param [Array] r An array of Mailbox type hashes to send to #mailbox!
     def to_recipients!(r)
@@ -1496,7 +1382,7 @@ module Viewpoint::EWS::SOAP
       nbuild[NS_EWS_TYPES].BccRecipients {
         if r.is_a?(Hash)
           mailbox!(r[:mailbox])
-        else        
+        else
           r.each {|mbox| mailbox!(mbox[:mailbox]) }
         end
       }
@@ -1596,10 +1482,10 @@ module Viewpoint::EWS::SOAP
     def item_changes!(changes)
       nbuild.ItemChanges {
         if changes.is_a?(Hash)
-          item_change!(changes)
+          item_change!(change[:item_change])
         else
           changes.each do |chg|
-            item_change!(chg)
+            item_change!(chg[:item_change])
           end
         end
       }
@@ -1645,7 +1531,7 @@ module Viewpoint::EWS::SOAP
       upd.delete(uri.keys.first)
       @nbuild[NS_EWS_TYPES].SetItemField {
         dispatch_field_uri!(uri, NS_EWS_TYPES)
-        dispatch_field_item!(upd, NS_EWS_TYPES)
+        dispatch_field_item!(upd)
       }
     end
 
@@ -1817,7 +1703,23 @@ module Viewpoint::EWS::SOAP
     # Insert item, enforce xmlns attribute if prefix is present
     def dispatch_field_item!(item, ns_prefix = nil)
       item.values.first[:xmlns_attribute] = ns_prefix if ns_prefix
-      build_xml!(item)
+      type = item.keys.first
+      val = item[type]
+      case type.to_sym
+      when :item
+      when :message
+      when :calendar_item
+      when :contact
+        contact!(val)
+      when :distribution_list
+      when :meeting_message
+      when :meeting_request
+      when :meeting_response
+      when :meeting_cancellation
+      when :task
+      else
+        raise EwsBadArgumentError, "Bad SetItemField element. #{type}"
+      end
     end
 
     def room_list!(cfg_prop)
