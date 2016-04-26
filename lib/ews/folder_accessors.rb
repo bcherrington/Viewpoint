@@ -29,7 +29,7 @@ module Viewpoint::EWS::FolderAccessors
   # @param [Hash] opts Misc options to control request
   # @option opts [String,Symbol] :root Either a FolderId(String) or a
   #   DistinguishedFolderId(Symbol) . This is where to start the search from.
-  #   Usually :root,:msgfolderroot, or :publicfoldersroot 
+  #   Usually :root,:msgfolderroot, or :publicfoldersroot
   # @option opts [Symbol] :traversal :shallow/:deep/:soft_deleted
   # @option opts [Symbol] :shape :id_only/:default/:all_properties
   # @option opts [optional, String] :folder_type an optional folder type to
@@ -95,8 +95,11 @@ module Viewpoint::EWS::FolderAccessors
   # @see http://msdn.microsoft.com/en-us/library/aa580808.aspx
   def make_folder(name, opts={})
     parent = opts[:parent] || :msgfolderroot
-    resp = ews.create_folder :parent_folder_id => {:id => parent},
-      :folders => [folder_type(opts[:type]) => {:display_name => name}]
+    pid = {}
+    pid[:id] = parent
+    pid[:act_as] = opts[:act_as] if opts.key?(:act_as)
+    resp = ews.create_folder parent_folder_id: pid,
+      :folders => [folder_type(opts[:type]) => {:display_name => {text: name}}]
     create_folder_parser(resp).first
   end
   alias :mkfolder :make_folder
@@ -137,7 +140,7 @@ private
     folder_id = {:id => opts[:root]}
     folder_id[:act_as] = opts[:act_as] if opts[:act_as]
     if( opts[:folder_type] )
-      restr = { :is_equal_to => 
+      restr = { :is_equal_to =>
         [
           {:field_uRI => {:field_uRI=>'folder:FolderClass'}},
           {:field_uRI_or_constant=>{:constant =>
@@ -195,7 +198,7 @@ private
   # @param [Viewpoint::EWS::SOAP::EwsSoapResponse] resp
   def get_folder_parser(resp)
     if(resp.status == 'Success')
-      f = resp.response_message[:root_folder][:folders]
+      f = resp.response_message[:folders]
       ftype = f.keys.first
       class_by_name(ftype).new(ews, f[ftype])
     else
