@@ -378,9 +378,14 @@ module Viewpoint::EWS::Types
       if(rm.status == 'Success')
         # items = FolderView.new(rm.root_folder)
         items = []
-        rm.root_folder.items.each do |i|
+        if rm.root_folder.items.is_a? Array
+          folder_items = rm.root_folder.items
+        else
+          folder_items = [rm.root_folder.items]
+        end
+        folder_items.each do |i|
           type = i.keys.first
-          items << class_by_name(type).new(ews, i[type], self)
+          items << class_by_name(type).new(ews, i[type], self) unless type.nil?
         end
         items
       else
