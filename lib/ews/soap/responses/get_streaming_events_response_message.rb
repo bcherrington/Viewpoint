@@ -33,7 +33,7 @@ module Viewpoint::EWS::SOAP
 
     def error_subscription_ids
       e = safe_hash_access message, [:elems, :error_subscription_ids, :elems]
-      e.nil? ? [] : e.map {|e| safe_hash_access(e, [:subscription_id, :text])}
+      e.nil? ? [] : e.map {|m| safe_hash_access(m, [:subscription_id, :text])}
     end
 
     private
