@@ -1444,11 +1444,11 @@ module Viewpoint::EWS::SOAP
     end
 
     def start_date!(sd)
-      nbuild[NS_EWS_TYPES].StartDate sd[:text]
+      nbuild[NS_EWS_TYPES].StartDate(format_time(sd[:text]))
     end
 
     def due_date!(dd)
-      nbuild[NS_EWS_TYPES].DueDate format_time(dd[:text])
+      nbuild[NS_EWS_TYPES].DueDate(format_time(dd[:text]))
     end
 
     def location!(loc)
