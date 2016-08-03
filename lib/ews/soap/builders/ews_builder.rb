@@ -27,26 +27,25 @@ module Viewpoint::EWS::SOAP
     RESERVED_ATTRIBUTE_KEYS = %w{text sub_elements xmlns_attribute}.map(&:to_sym).freeze
 
     attr_reader :nbuild
+
     def initialize
       @nbuild = Nokogiri::XML::Builder.new
     end
 
     def self.camel_case_attributes(input)
       case input
-      when Hash
-        result = {}
-        input.each do |attrib_key, attrib_value|
-          unless RESERVED_ATTRIBUTE_KEYS.include?(attrib_key)
-            attrib_key = camel_case(attrib_key)
-          end
+        when Hash
+          result = {}
+          input.each do |attrib_key, attrib_value|
+            attrib_key = camel_case(attrib_key) unless RESERVED_ATTRIBUTE_KEYS.include?(attrib_key)
 
-          result[attrib_key] = camel_case_attributes(attrib_value)
-        end
-        result
-      when Array
-        result = input.map { |value| camel_case_attributes(value) }
-      else
-        input
+            result[attrib_key] = camel_case_attributes(attrib_value)
+          end
+          result
+        when Array
+          result = input.map { |value| camel_case_attributes(value) }
+        else
+          input
       end
     end
 
@@ -76,9 +75,7 @@ module Viewpoint::EWS::SOAP
           set_time_zone_context_header! opts[:time_zone_context]
           yield(:header, self) if block_given?
         }
-        node.Body {
-          yield(:body, self) if block_given?
-        }
+        node.Body { yield(:body, self) if block_given? }
       end
       @nbuild.doc
     end
@@ -105,34 +102,26 @@ module Viewpoint::EWS::SOAP
     #   (:sub_elements) and namespaces (:xmlns).
     def build_xml!(elems)
       case elems.class.name
-      when 'Hash'
-        keys = elems.keys
-        vals = elems.values
-        if(keys.length > 1 && !vals.is_a?(Hash))
-          raise "invalid input: #{elems}"
-        end
-        vals = vals.first.clone
-        se = vals.delete(:sub_elements)
-        txt = vals.delete(:text)
-        xmlns_attribute = vals.delete(:xmlns_attribute)
-        if keys.first == "string"
-          node = @nbuild.String(txt, vals) {|x|
-            build_xml!(se) if se
-          }
-        else
-          node = @nbuild.send(camel_case(keys.first), txt, vals) {|x|
-            build_xml!(se) if se
-          }
-        end
+        when 'Hash'
+          keys = elems.keys
+          vals = elems.values
+          raise "invalid input: #{elems}" if (keys.length > 1 && !vals.is_a?(Hash))
+          vals            = vals.first.clone
+          se              = vals.delete(:sub_elements)
+          txt             = vals.delete(:text)
+          xmlns_attribute = vals.delete(:xmlns_attribute)
+          if keys.first == 'string'
+            node = @nbuild.String(txt, vals) { |x| build_xml!(se) if se }
+          else
+            node = @nbuild.send(camel_case(keys.first), txt, vals) { |x| build_xml!(se) if se }
+          end
 
-        # Set node level namespace
-        node.xmlns = NAMESPACES["xmlns:#{xmlns_attribute}"] if xmlns_attribute
-      when 'Array'
-        elems.each do |e|
-          build_xml!(e)
-        end
-      else
-        raise "Unsupported type: #{elems.class.name}"
+          # Set node level namespace
+          node.xmlns = NAMESPACES["xmlns:#{xmlns_attribute}"] if xmlns_attribute
+        when 'Array'
+          elems.each { |e| build_xml!(e) }
+        else
+          raise "Unsupported type: #{elems.class.name}"
       end
     end
 
@@ -144,9 +133,7 @@ module Viewpoint::EWS::SOAP
       @nbuild.FolderShape {
         @nbuild.parent.default_namespace = @default_ns
         base_shape!(folder_shape[:base_shape])
-        if(folder_shape[:additional_properties])
-          additional_properties!(folder_shape[:additional_properties])
-        end
+        additional_properties!(folder_shape[:additional_properties]) if (folder_shape[:additional_properties])
       }
     end
 
@@ -160,18 +147,16 @@ module Viewpoint::EWS::SOAP
         base_shape!(item_shape[:base_shape])
         mime_content!(item_shape[:include_mime_content]) if item_shape.has_key?(:include_mime_content)
         body_type!(item_shape[:body_type]) if item_shape[:body_type]
-        if(item_shape[:additional_properties])
-          additional_properties!(item_shape[:additional_properties])
-        end
+        additional_properties!(item_shape[:additional_properties]) if (item_shape[:additional_properties])
       }
     end
 
     # Build the IndexedPageItemView element
     # @see http://msdn.microsoft.com/en-us/library/exchange/aa563549(v=exchg.150).aspx
     # @todo needs peer check
-    def indexed_page_item_view!(indexed_page_item_view)
+    def indexed_page_item_view!(view)
       attribs = {}
-      indexed_page_item_view.each_pair {|k,v| attribs[camel_case(k)] = v.to_s}
+      view.each_pair { |k, v| attribs[camel_case(k)] = v.to_s }
       @nbuild[NS_EWS_MESSAGES].IndexedPageItemView(attribs)
     end
 
@@ -180,9 +165,7 @@ module Viewpoint::EWS::SOAP
     # @todo needs peer check
     def sort_order!(sort_order)
       @nbuild[NS_EWS_MESSAGES].SortOrder {
-        sort_order[:field_orders].each { |field_order|
-          field_order!(field_order)
-        }
+        sort_order[:field_orders].each { |field_order| field_order!(field_order) }
       }
     end
 
@@ -191,11 +174,9 @@ module Viewpoint::EWS::SOAP
     # @todo needs peer check
     def field_order!(field_order)
       field_order = field_order.dup
-      order = field_order.delete(:order)
+      order       = field_order.delete(:order)
       @nbuild[NS_EWS_TYPES].FieldOrder('Order' => order) {
-        field_order.each_pair { |k, v|
-          dispatch_field_uri!({k => v}, NS_EWS_TYPES)
-        }
+        field_order.each_pair { |k, v| dispatch_field_uri!({ k => v }, NS_EWS_TYPES) }
       }
     end
 
@@ -223,18 +204,14 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa565998.aspx
     def parent_folder_ids!(pfids)
       @nbuild[NS_EWS_MESSAGES].ParentFolderIds {
-        pfids.each do |pfid|
-          dispatch_folder_id!(pfid)
-        end
+        pfids.each { |pfid| dispatch_folder_id!(pfid) }
       }
     end
 
     # Build the ParentFolderId element
     # @see http://msdn.microsoft.com/en-us/library/aa563268.aspx
     def parent_folder_id!(pfid)
-      @nbuild.ParentFolderId {
-        dispatch_folder_id!(pfid)
-      }
+      @nbuild.ParentFolderId { dispatch_folder_id!(pfid) }
     end
 
     # Build the FolderIds element
@@ -261,19 +238,17 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa580808.aspx
     # @todo add support for the Mailbox child object
     def distinguished_folder_id!(dfid, change_key = nil, act_as = nil)
-      attribs = {'Id' => dfid.to_s}
+      attribs              = { 'Id' => dfid.to_s }
       attribs['ChangeKey'] = change_key if change_key
       @nbuild[NS_EWS_TYPES].DistinguishedFolderId(attribs) {
-        if ! act_as.nil?
-          mailbox!({:email_address => act_as})
-        end
+        mailbox!({ email_address: act_as }) unless act_as.nil?
       }
     end
 
     # Build the FolderId element
     # @see http://msdn.microsoft.com/en-us/library/aa579461.aspx
     def folder_id!(fid, change_key = nil)
-      attribs = {'Id' => fid}
+      attribs              = { 'Id' => fid }
       attribs['ChangeKey'] = change_key if change_key
       @nbuild[NS_EWS_TYPES].FolderId(attribs)
     end
@@ -281,54 +256,50 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa563525(v=EXCHG.140).aspx
     def item_ids!(item_ids)
       @nbuild.ItemIds {
-        item_ids.each do |iid|
-          dispatch_item_id!(iid)
-        end
+        item_ids.each { |iid| dispatch_item_id!(iid) }
       }
     end
 
     def parent_item_id!(id)
-      nbuild.ParentItemId {|x|
-        x.parent['Id'] = id[:id]
+      nbuild.ParentItemId do |x|
+        x.parent['Id']        = id[:id]
         x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
-      }
+      end
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa580234(v=EXCHG.140).aspx
     def item_id!(id)
-      nbuild[NS_EWS_TYPES].ItemId {|x|
-        x.parent['Id'] = id[:id]
+      nbuild[NS_EWS_TYPES].ItemId do |x|
+        x.parent['Id']        = id[:id]
         x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
-      }
+      end
     end
 
     # @see http://msdn.microsoft.com/en-us/library/ff709503(v=exchg.140).aspx
     def export_item_ids!(item_ids)
       ns = @nbuild.parent.name.match(/subscription/i) ? NS_EWS_TYPES : NS_EWS_MESSAGES
-      @nbuild[ns].ExportItems{
+      @nbuild[ns].ExportItems {
         @nbuild.ItemIds {
-          item_ids.each do |iid|
-            dispatch_item_id!(iid)
-          end
+          item_ids.each { |iid| dispatch_item_id!(iid) }
         }
       }
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa580744(v=EXCHG.140).aspx
     def occurrence_item_id!(id)
-      @nbuild[NS_EWS_TYPES].OccurrenceItemId {|x|
+      @nbuild[NS_EWS_TYPES].OccurrenceItemId do |x|
         x.parent['RecurringMasterId'] = id[:recurring_master_id]
-        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
-        x.parent['InstanceIndex'] = id[:instance_index]
-      }
+        x.parent['ChangeKey']         = id[:change_key] if id[:change_key]
+        x.parent['InstanceIndex']     = id[:instance_index]
+      end
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa581019(v=EXCHG.140).aspx
     def recurring_master_item_id!(id)
-      @nbuild[NS_EWS_TYPES].RecurringMasterItemId {|x|
+      @nbuild[NS_EWS_TYPES].RecurringMasterItemId do |x|
         x.parent['OccurrenceId'] = id[:occurrence_id]
-        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
-      }
+        x.parent['ChangeKey']    = id[:change_key] if id[:change_key]
+      end
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa565020(v=EXCHG.140).aspx
@@ -340,35 +311,33 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa564009.aspx
     def folders!(folders)
-      @nbuild.Folders {|x|
+      @nbuild.Folders do |x|
         folders.each do |fold|
           fold.each_pair do |ftype, vars| # convenience, should only be one pair
             ftype = "#{ftype}!".to_sym
             if self.respond_to? ftype
               self.send ftype, vars
             else
-              raise Viewpoint::EWS::EwsNotImplemented,
-                "#{ftype} not implemented as a builder."
+              raise Viewpoint::EWS::EwsNotImplemented, "#{ftype} not implemented as a builder."
             end
           end
         end
-      }
+      end
     end
 
     def folder!(folder, type = :Folder)
-      nbuild[NS_EWS_TYPES].send(type) {|x|
-        folder.each_pair do |e,v|
+      nbuild[NS_EWS_TYPES].send(type) do |x|
+        folder.each_pair do |e, v|
           ftype = "#{e}!".to_sym
           if e == :folder_id
             dispatch_folder_id!(v)
           elsif self.respond_to?(ftype)
             self.send ftype, v
           else
-            raise Viewpoint::EWS::EwsNotImplemented,
-              "#{ftype} not implemented as a builder."
+            raise Viewpoint::EWS::EwsNotImplemented, "#{ftype} not implemented as a builder."
           end
         end
-      }
+      end
     end
 
     def calendar_folder!(folder)
@@ -393,14 +362,14 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa565683(v=exchg.140).aspx
     def categories!(names)
-      nbuild[NS_EWS_TYPES].Categories{
-        names.each{|name|nbuild[NS_EWS_TYPES].String(name[:string][:text])}
+      nbuild[NS_EWS_TYPES].Categories {
+        names.each { |name| nbuild[NS_EWS_TYPES].String(name[:string][:text]) }
       }
     end
 
     def companies!(names)
-      nbuild[NS_EWS_TYPES].Companies{
-        names.each{|name|nbuild[NS_EWS_TYPES].String(name)}
+      nbuild[NS_EWS_TYPES].Companies {
+        names.each { |name| nbuild[NS_EWS_TYPES].String(name) }
       }
     end
 
@@ -408,9 +377,7 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa563810.aspx
     def additional_properties!(addprops)
       @nbuild[NS_EWS_TYPES].AdditionalProperties {
-        addprops.each {|v|
-          dispatch_field_uri!(v, NS_EWS_TYPES)
-        }
+        addprops.each { |v| dispatch_field_uri!(v, NS_EWS_TYPES) }
       }
     end
 
@@ -447,7 +414,8 @@ module Viewpoint::EWS::SOAP
       nbuild[NS_EWS_TYPES].RoutingType(type)
     end
 
-    def mailbox_type!(type)Standard
+    def mailbox_type!(type)
+      Standard
       nbuild[NS_EWS_TYPES].MailboxType(type)
     end
 
@@ -456,12 +424,8 @@ module Viewpoint::EWS::SOAP
         nbuild.OofState(camel_case(opts[:oof_state]))
         nbuild.ExternalAudience(camel_case(opts[:external_audience])) if opts[:external_audience]
         duration!(opts[:duration]) if opts[:duration]
-        nbuild.InternalReply {
-          nbuild.Message(opts[:internal_reply])
-        } if opts[:external_reply]
-        nbuild.ExternalReply {
-          nbuild.Message(opts[:external_reply])
-        } if opts[:external_reply]
+        nbuild.InternalReply { nbuild.Message(opts[:internal_reply]) } if opts[:external_reply]
+        nbuild.ExternalReply { nbuild.Message(opts[:external_reply]) } if opts[:external_reply]
       }
     end
 
@@ -500,21 +464,21 @@ module Viewpoint::EWS::SOAP
     def time_zone!(zone)
       zone ||= {}
       zone = {
-        bias: zone[:bias] || 480,
-        standard_time: {
-          bias: 0,
-          time: "02:00:00",
-          day_order: 5,
-          month: 10,
-          day_of_week: 'Sunday'
-        }.merge(zone[:standard_time] || {}),
-        daylight_time: {
-          bias: -60,
-          time: "02:00:00",
-          day_order: 1,
-          month: 4,
-          day_of_week: 'Sunday'
-        }.merge(zone[:daylight_time] || {})
+          bias:          zone[:bias] || 480,
+          standard_time: {
+                             bias:        0,
+                             time:        '02:00:00',
+                             day_order:   5,
+                             month:       10,
+                             day_of_week: 'Sunday'
+                         }.merge(zone[:standard_time] || {}),
+          daylight_time: {
+                             bias:        -60,
+                             time:        '02:00:00',
+                             day_order:   1,
+                             month:       4,
+                             day_of_week: 'Sunday'
+                         }.merge(zone[:daylight_time] || {})
       }
 
       nbuild[NS_EWS_TYPES].TimeZone {
@@ -537,13 +501,11 @@ module Viewpoint::EWS::SOAP
     end
 
     # Request all known time_zones from server
-    def get_server_time_zones!(get_time_zone_options)
-      nbuild[NS_EWS_MESSAGES].GetServerTimeZones('ReturnFullTimeZoneData' => get_time_zone_options[:full]) do
-        if get_time_zone_options[:ids] && get_time_zone_options[:ids].any?
+    def get_server_time_zones!(options)
+      nbuild[NS_EWS_MESSAGES].GetServerTimeZones('ReturnFullTimeZoneData' => options[:full]) do
+        if options[:ids] && options[:ids].any?
           nbuild[NS_EWS_MESSAGES].Ids do
-            get_time_zone_options[:ids].each do |id|
-              nbuild[NS_EWS_TYPES].Id id
-            end
+            options[:ids].each { |id| nbuild[NS_EWS_TYPES].Id id }
           end
         end
       end
@@ -556,8 +518,8 @@ module Viewpoint::EWS::SOAP
     # @todo Implement sub elements Periods, TransitionsGroups and Transitions to override zone
     # @see http://msdn.microsoft.com/en-us/library/exchange/dd899524.aspx
     def start_time_zone!(zone)
-      attributes = {}
-      attributes['Id'] = zone[:id] if zone[:id]
+      attributes         = {}
+      attributes['Id']   = zone[:id] if zone[:id]
       attributes['Name'] = zone[:name] if zone[:name]
       nbuild[NS_EWS_TYPES].StartTimeZone(attributes)
     end
@@ -569,8 +531,8 @@ module Viewpoint::EWS::SOAP
     # @todo Implement sub elements Periods, TransitionsGroups and Transitions to override zone
     # @see http://msdn.microsoft.com/en-us/library/exchange/dd899434.aspx
     def end_time_zone!(zone)
-      attributes = {}
-      attributes['Id'] = zone[:id] if zone[:id]
+      attributes         = {}
+      attributes['Id']   = zone[:id] if zone[:id]
       attributes['Name'] = zone[:name] if zone[:name]
       nbuild[NS_EWS_TYPES].EndTimeZone(attributes)
     end
@@ -579,7 +541,7 @@ module Viewpoint::EWS::SOAP
     # @todo Implement subelements Periods, TransitionsGroups and Transitions to override zone
     # @see http://msdn.microsoft.com/en-us/library/exchange/dd899488.aspx
     def time_zone_definition!(zone)
-      attributes = {'Id' => zone[:id]}
+      attributes         = { 'Id' => zone[:id] }
       attributes['Name'] = zone[:name] if zone[:name]
       nbuild[NS_EWS_TYPES].TimeZoneDefinition(attributes)
     end
@@ -589,9 +551,7 @@ module Viewpoint::EWS::SOAP
     # @param [Hash] restriction a well-formatted Hash that can be fed to #build_xml!
     def restriction!(restriction)
       @nbuild[NS_EWS_MESSAGES].Restriction {
-        restriction.each_pair do |k,v|
-          self.send normalize_type(k), v
-        end
+        restriction.each_pair { |k, v| self.send normalize_type(k), v }
       }
     end
 
@@ -621,9 +581,9 @@ module Viewpoint::EWS::SOAP
 
     def contains(expr)
       @nbuild[NS_EWS_TYPES].Contains(
-        'ContainmentMode' => expr.delete(:containment_mode),
-        'ContainmentComparison' => expr.delete(:containment_comparison)) {
-        c = expr.delete(:constant) # remove constant 1st for ordering
+          'ContainmentMode'       => expr.delete(:containment_mode),
+          'ContainmentComparison' => expr.delete(:containment_comparison)) {
+        c    = expr.delete(:constant) # remove constant 1st for ordering
         type = expr.keys.first
         self.send(type, expr[type])
         constant(c)
@@ -632,7 +592,7 @@ module Viewpoint::EWS::SOAP
 
     def excludes(expr)
       @nbuild[NS_EWS_TYPES].Excludes {
-        b = expr.delete(:bitmask) # remove bitmask 1st for ordering
+        b    = expr.delete(:bitmask) # remove bitmask 1st for ordering
         type = expr.keys.first
         self.send(type, expr[type])
         bitmask(b)
@@ -651,38 +611,35 @@ module Viewpoint::EWS::SOAP
     end
 
     def is_equal_to(expr)
-      restriction_compare('IsEqualTo',expr)
+      restriction_compare('IsEqualTo', expr)
     end
 
     def is_greater_than(expr)
-      restriction_compare('IsGreaterThan',expr)
+      restriction_compare('IsGreaterThan', expr)
     end
 
     def is_greater_than_or_equal_to(expr)
-      restriction_compare('IsGreaterThanOrEqualTo',expr)
+      restriction_compare('IsGreaterThanOrEqualTo', expr)
     end
 
     def is_less_than(expr)
-      restriction_compare('IsLessThan',expr)
+      restriction_compare('IsLessThan', expr)
     end
 
     def is_less_than_or_equal_to(expr)
-      restriction_compare('IsLessThanOrEqualTo',expr)
+      restriction_compare('IsLessThanOrEqualTo', expr)
     end
 
     def is_not_equal_to(expr)
-      restriction_compare('IsNotEqualTo',expr)
+      restriction_compare('IsNotEqualTo', expr)
     end
 
     def restriction_compare(type, expr)
       expr = [expr] unless expr.is_a? Array
 
       nbuild[NS_EWS_TYPES].send(type) {
-        expr.each do |e|
-          e.each_pair do |k,v|
-            self.send(k, v)
-          end
-        end
+        expr.each { |e| e.each_pair { |k, v| self.send(k, v) }
+        }
       }
     end
 
@@ -699,8 +656,8 @@ module Viewpoint::EWS::SOAP
 
     def indexed_field_uRI(expr)
       nbuild[NS_EWS_TYPES].IndexedFieldURI(
-        'FieldURI'    => (expr[:field_uRI] || expr[:field_uri]),
-        'FieldIndex'  => expr[:field_index]
+          'FieldURI'   => (expr[:field_uRI] || expr[:field_uri]),
+          'FieldIndex' => expr[:field_index]
       )
     end
 
@@ -709,29 +666,27 @@ module Viewpoint::EWS::SOAP
     def extended_field_uRI(expr)
       nbuild[NS_EWS_TYPES].ExtendedFieldURI {
         nbuild.parent['DistinguishedPropertySetId'] = expr[:distinguished_property_set_id] if expr[:distinguished_property_set_id]
-        nbuild.parent['PropertySetId'] = expr[:property_set_id] if expr[:property_set_id]
-        nbuild.parent['PropertyTag'] = expr[:property_tag] if expr[:property_tag]
-        nbuild.parent['PropertyName'] = expr[:property_name] if expr[:property_name]
-        nbuild.parent['PropertyId'] = expr[:property_id] if expr[:property_id]
-        nbuild.parent['PropertyType'] = expr[:property_type] if expr[:property_type]
+        nbuild.parent['PropertySetId']              = expr[:property_set_id] if expr[:property_set_id]
+        nbuild.parent['PropertyTag']                = expr[:property_tag] if expr[:property_tag]
+        nbuild.parent['PropertyName']               = expr[:property_name] if expr[:property_name]
+        nbuild.parent['PropertyId']                 = expr[:property_id] if expr[:property_id]
+        nbuild.parent['PropertyType']               = expr[:property_type] if expr[:property_type]
       }
     end
 
     alias_method :extended_field_uri, :extended_field_uRI
 
     def extended_properties!(eprops)
-      eprops.each {|ep| extended_property!(ep)}
+      eprops.each { |ep| extended_property!(ep) }
     end
 
     def extended_property!(eprop)
       nbuild[NS_EWS_TYPES].ExtendedProperty {
         key = eprop.keys.grep(/extended/i).first
-        dispatch_field_uri!({key => eprop[key]}, NS_EWS_TYPES)
+        dispatch_field_uri!({ key => eprop[key] }, NS_EWS_TYPES)
         if eprop[:values]
           nbuild.Values {
-            eprop[:values].each do |v|
-                value! v
-            end
+            eprop[:values].each { |v| value! v }
           }
         elsif eprop[:value]
           value! eprop[:value]
@@ -759,23 +714,21 @@ module Viewpoint::EWS::SOAP
     # Build the CalendarView element
     def calendar_view!(cal_view)
       attribs = {}
-      cal_view.each_pair {|k,v| attribs[camel_case(k)] = v.to_s}
+      cal_view.each_pair { |k, v| attribs[camel_case(k)] = v.to_s }
       @nbuild[NS_EWS_MESSAGES].CalendarView(attribs)
     end
 
     # Build the ContactsView element
     def contacts_view!(con_view)
       attribs = {}
-      con_view.each_pair {|k,v| attribs[camel_case(k)] = v.to_s}
+      con_view.each_pair { |k, v| attribs[camel_case(k)] = v.to_s }
       @nbuild[NS_EWS_MESSAGES].ContactsView(attribs)
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa579678(v=EXCHG.140).aspx
     def event_types!(evtypes)
       @nbuild[NS_EWS_TYPES].EventTypes {
-        evtypes.each do |et|
-          @nbuild[NS_EWS_TYPES].EventType(camel_case(et))
-        end
+        evtypes.each { |et| @nbuild[NS_EWS_TYPES].EventType(camel_case(et)) }
       }
     end
 
@@ -806,9 +759,7 @@ module Viewpoint::EWS::SOAP
 
     def subscription_ids!(subids)
       @nbuild[NS_EWS_MESSAGES].SubscriptionIds {
-        subids.each do |subid|
-          @nbuild[NS_EWS_TYPES].SubscriptionId(subid)
-        end
+        subids.each { |subid| @nbuild[NS_EWS_TYPES].SubscriptionId(subid) }
       }
     end
 
@@ -857,9 +808,7 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa563785(v=EXCHG.140).aspx
     def ignore!(item_ids)
       @nbuild.Ignore {
-        item_ids.each do |iid|
-          item_id!(iid)
-        end
+        item_ids.each { |iid| item_id!(iid) }
       }
     end
 
@@ -883,29 +832,21 @@ module Viewpoint::EWS::SOAP
     # @see http://msdn.microsoft.com/en-us/library/aa565652(v=exchg.140).aspx
     def item!(item)
       nbuild.Item {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa581315(v=exchg.140).aspx
     def contact!(item)
       nbuild[NS_EWS_TYPES].Contact {
-        item.each_pair do |k,v|
-          r = self.send("#{k}!", v)
-        end
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def message!(item)
       nbuild[NS_EWS_TYPES].Message {
-        if item[:extended_properties]
-          extended_properties! item.delete(:extended_properties)
-        end
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        extended_properties! item.delete(:extended_properties) if item[:extended_properties]
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
@@ -915,9 +856,7 @@ module Viewpoint::EWS::SOAP
 
     def calendar_item!(item)
       nbuild[NS_EWS_TYPES].CalendarItem {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
@@ -927,41 +866,31 @@ module Viewpoint::EWS::SOAP
 
     def recurrence!(item)
       nbuild[NS_EWS_TYPES].Recurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def daily_recurrence!(item)
       nbuild[NS_EWS_TYPES].DailyRecurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def weekly_recurrence!(item)
       nbuild[NS_EWS_TYPES].WeeklyRecurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def absolute_yearly_recurrence!(item)
       nbuild[NS_EWS_TYPES].AbsoluteYearlyRecurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def relative_yearly_recurrence!(item)
       nbuild[NS_EWS_TYPES].RelativeYearlyRecurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
@@ -987,17 +916,13 @@ module Viewpoint::EWS::SOAP
 
     def no_end_recurrence!(item)
       nbuild[NS_EWS_TYPES].NoEndRecurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def numbered_recurrence!(item)
       nbuild[NS_EWS_TYPES].NumberedRecurrence {
-        item.each_pair { |k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
@@ -1007,49 +932,39 @@ module Viewpoint::EWS::SOAP
 
     def cancel_calendar_item!(item)
       nbuild[NS_EWS_TYPES].CancelCalendarItem {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def task!(item)
       nbuild[NS_EWS_TYPES].Task {
-        item.each_pair {|k, v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def forward_item!(item)
       nbuild[NS_EWS_TYPES].ForwardItem {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def reply_to_item!(item)
       nbuild[NS_EWS_TYPES].ReplyToItem {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def reply_all_to_item!(item)
       nbuild[NS_EWS_TYPES].ReplyAllToItem {
-        item.each_pair {|k,v|
-          self.send("#{k}!", v)
-        }
+        item.each_pair { |k, v| self.send("#{k}!", v) }
       }
     end
 
     def reference_item_id!(id)
-      nbuild[NS_EWS_TYPES].ReferenceItemId {|x|
-        x.parent['Id'] = id[:id]
+      nbuild[NS_EWS_TYPES].ReferenceItemId do |x|
+        x.parent['Id']        = id[:id]
         x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
-      }
+      end
     end
 
     def subject!(sub)
@@ -1061,18 +976,14 @@ module Viewpoint::EWS::SOAP
     end
 
     def body!(b)
-      nbuild[NS_EWS_TYPES].Body(b[:text]) {|x|
-        x.parent['BodyType'] = b[:body_type] if b[:body_type]
-      }
+      nbuild[NS_EWS_TYPES].Body(b[:text]) { |x| x.parent['BodyType'] = b[:body_type] if b[:body_type] }
     end
 
     def new_body_content!(b)
-      nbuild[NS_EWS_TYPES].NewBodyContent(b[:text]) {|x|
-        x.parent['BodyType'] = b[:body_type] if b[:body_type]
-      }
+      nbuild[NS_EWS_TYPES].NewBodyContent(b[:text]) { |x| x.parent['BodyType'] = b[:body_type] if b[:body_type] }
     end
 
-# @see http://msdn.microsoft.com/en-us/library/aa581315(v=exchg.140).aspx
+    # @see http://msdn.microsoft.com/en-us/library/aa581315(v=exchg.140).aspx
 =begin
    <MimeContent/>
    <ItemId/>
@@ -1177,13 +1088,13 @@ module Viewpoint::EWS::SOAP
         if e.is_a?(Hash)
           emailaddress!(e[:entry])
         else
-          e.each {|email| emailaddress!(email[:entry]) }
+          e.each { |email| emailaddress!(email[:entry]) }
         end
       }
     end
 
     def emailaddress!(e)
-      nbuild[NS_EWS_TYPES].Entry("Key" => e[:key]) {
+      nbuild[NS_EWS_TYPES].Entry('Key' => e[:key]) {
         nbuild.text(e[:text])
       }
     end
@@ -1194,13 +1105,13 @@ module Viewpoint::EWS::SOAP
         if p.is_a?(Hash)
           physicaladdress!(p[:entry])
         else
-          p.each {|address| physicaladdress!(address[:entry]) }
+          p.each { |address| physicaladdress!(address[:entry]) }
         end
       }
     end
 
     def physicaladdress!(p)
-      nbuild[NS_EWS_TYPES].Entry("Key" => p[:key]) {
+      nbuild[NS_EWS_TYPES].Entry('Key' => p[:key]) {
         nbuild[NS_EWS_TYPES].Street(p[:street][:text])
         nbuild[NS_EWS_TYPES].City(p[:city][:text])
         nbuild[NS_EWS_TYPES].State(p[:state][:text])
@@ -1216,13 +1127,13 @@ module Viewpoint::EWS::SOAP
         if p.is_a?(Hash)
           phonenumbers!(p[:entry])
         else
-          p.each {|phone| phonenumbers!(phone[:entry]) }
+          p.each { |phone| phonenumbers!(phone[:entry]) }
         end
       }
     end
 
     def phonenumbers!(p)
-      nbuild[NS_EWS_TYPES].Entry("Key" => p[:key]) {
+      nbuild[NS_EWS_TYPES].Entry('Key' => p[:key]) {
         nbuild.text(p[:text])
       }
     end
@@ -1241,13 +1152,13 @@ module Viewpoint::EWS::SOAP
         if d.is_a?(Hash)
           imaddresses!(d[:entry])
         else
-          d.each {|imaddress| imaddresses!(imaddress[:entry]) }
+          d.each { |imaddress| imaddresses!(imaddress[:entry]) }
         end
       }
     end
 
     def imaddresses!(d)
-      nbuild[NS_EWS_TYPES].Entry("Key" => d[:key]) {
+      nbuild[NS_EWS_TYPES].Entry('Key' => d[:key]) {
         nbuild.text(d[:text])
       }
     end
@@ -1284,7 +1195,7 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa563467(v=exchg.140).aspx
     # def importance!(i)
-      # nbuild[NS_EWS_TYPES].Importance(i[:text])
+    # nbuild[NS_EWS_TYPES].Importance(i[:text])
     # end
 
     # @SEE http://msdn.microsoft.com/en-us/library/dd899429(v=exchg.140).aspx
@@ -1363,7 +1274,7 @@ module Viewpoint::EWS::SOAP
         if r.is_a?(Hash)
           mailbox!(r[:mailbox])
         else
-          r.each {|mbox| mailbox!(mbox[:mailbox]) }
+          r.each { |mbox| mailbox!(mbox[:mailbox]) }
         end
       }
     end
@@ -1373,7 +1284,7 @@ module Viewpoint::EWS::SOAP
         if r.is_a?(Hash)
           mailbox!(r[:mailbox])
         else
-          r.each {|mbox| mailbox!(mbox[:mailbox]) }
+          r.each { |mbox| mailbox!(mbox[:mailbox]) }
         end
       }
     end
@@ -1383,15 +1294,13 @@ module Viewpoint::EWS::SOAP
         if r.is_a?(Hash)
           mailbox!(r[:mailbox])
         else
-          r.each {|mbox| mailbox!(mbox[:mailbox]) }
+          r.each { |mbox| mailbox!(mbox[:mailbox]) }
         end
       }
     end
 
     def from!(f)
-      nbuild[NS_EWS_TYPES].From {
-        mailbox! f
-      }
+      nbuild[NS_EWS_TYPES].From { mailbox! f }
     end
 
     def required_attendees!(attendees)
@@ -1399,7 +1308,7 @@ module Viewpoint::EWS::SOAP
         if attendees.is_a?(Hash)
           attendee!(attendees[:attendee])
         else
-          attendees.each {|a| attendee!(a[:attendee])}
+          attendees.each { |a| attendee!(a[:attendee]) }
         end
       }
     end
@@ -1409,7 +1318,7 @@ module Viewpoint::EWS::SOAP
         if attendees.is_a?(Hash)
           attendee!(attendees[:attendee])
         else
-          attendees.each {|a| attendee!(a[:attendee])}
+          attendees.each { |a| attendee!(a[:attendee]) }
         end
       }
     end
@@ -1419,16 +1328,14 @@ module Viewpoint::EWS::SOAP
         if attendees.is_a?(Hash)
           attendee!(attendees[:attendee])
         else
-          attendees.each {|a| attendee!(a[:attendee])}
+          attendees.each { |a| attendee!(a[:attendee]) }
         end
       }
     end
 
     # @todo support ResponseType, LastResponseTime: http://msdn.microsoft.com/en-us/library/aa580339.aspx
     def attendee!(a)
-      nbuild[NS_EWS_TYPES].Attendee {
-        mailbox!(a[:mailbox])
-      }
+      nbuild[NS_EWS_TYPES].Attendee { mailbox!(a[:mailbox]) }
     end
 
     def uid!(uid)
@@ -1493,11 +1400,11 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa581081(v=exchg.140).aspx
     def item_change!(change)
-      @nbuild[NS_EWS_TYPES].ItemChange {
+      @nbuild[NS_EWS_TYPES].ItemChange do
         updates = change.delete(:updates) # Remove updates so dispatch_item_id works correctly
         dispatch_item_id!(change)
         updates!(updates)
-      }
+      end
     end
 
     # @see http://msdn.microsoft.com/en-us/library/aa581074(v=exchg.140).aspx
@@ -1515,8 +1422,8 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa581317(v=exchg.140).aspx
     def append_to_item_field!(upd)
-      uri = upd.select {|k,v| k =~ /_uri/i}
-      raise EwsBadArgumentError, "Bad argument given for AppendToItemField." if uri.keys.length != 1
+      uri = upd.select { |k, v| k =~ /_uri/i }
+      raise EwsBadArgumentError, 'Bad argument given for AppendToItemField.' if uri.keys.length != 1
       upd.delete(uri.keys.first)
       @nbuild.AppendToItemField {
         dispatch_field_uri!(uri)
@@ -1526,8 +1433,8 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa581487(v=exchg.140).aspx
     def set_item_field!(upd)
-      uri = upd.select {|k,v| k =~ /_uri/i}
-      raise EwsBadArgumentError, "Bad argument given for SetItemField." if uri.keys.length != 1
+      uri = upd.select { |k, v| k =~ /_uri/i }
+      raise EwsBadArgumentError, 'Bad argument given for SetItemField.' if uri.keys.length != 1
       upd.delete(uri.keys.first)
       @nbuild[NS_EWS_TYPES].SetItemField {
         dispatch_field_uri!(uri, NS_EWS_TYPES)
@@ -1537,8 +1444,8 @@ module Viewpoint::EWS::SOAP
 
     # @see http://msdn.microsoft.com/en-us/library/aa580330(v=exchg.140).aspx
     def delete_item_field!(upd)
-      uri = upd.select {|k,v| k =~ /_uri/i}
-      raise EwsBadArgumentError, "Bad argument given for SetItemField." if uri.keys.length != 1
+      uri = upd.select { |k, v| k =~ /_uri/i }
+      raise EwsBadArgumentError, 'Bad argument given for SetItemField.' if uri.keys.length != 1
       @nbuild[NS_EWS_TYPES].DeleteItemField {
         dispatch_field_uri!(uri, NS_EWS_TYPES)
       }
@@ -1579,22 +1486,20 @@ module Viewpoint::EWS::SOAP
     def attachment_ids!(aids)
       @nbuild.AttachmentIds {
         @nbuild.parent.default_namespace = @default_ns
-        aids.each do |aid|
-          attachment_id!(aid)
-        end
+        aids.each { |aid| attachment_id!(aid) }
       }
     end
 
     # Build the AttachmentId element
     # @see http://msdn.microsoft.com/en-us/library/aa580764.aspx
     def attachment_id!(aid)
-      attribs = {'Id' => aid}
+      attribs = { 'Id' => aid }
       @nbuild[NS_EWS_TYPES].AttachmentId(attribs)
     end
 
     def user_configuration_name!(cfg_name)
-      ns = @nbuild.parent.parent.name.match(/UserConfiguration/i) ? NS_EWS_TYPES : NS_EWS_MESSAGES
-      attribs = {'Name' => cfg_name.delete(:name)}
+      ns      = @nbuild.parent.parent.name.match(/UserConfiguration/i) ? NS_EWS_TYPES : NS_EWS_MESSAGES
+      attribs = { 'Name' => cfg_name.delete(:name) }
       @nbuild[ns].UserConfigurationName(attribs) {
         fid = cfg_name.keys.first
         self.send "#{fid}!", cfg_name[fid][:id], cfg_name[fid][:change_key]
@@ -1606,10 +1511,10 @@ module Viewpoint::EWS::SOAP
     end
 
     def user_configuration!(options)
-      @nbuild[NS_EWS_MESSAGES].UserConfiguration {|x|
+      @nbuild[NS_EWS_MESSAGES].UserConfiguration do |x|
         user_configuration_name!(options[:user_config_name])
         xml_data!(options[:xml_data]) if options[:xml_data]
-      }
+      end
     end
 
     def xml_data!(xml_data)
@@ -1622,9 +1527,9 @@ module Viewpoint::EWS::SOAP
     # @param [Hash] fid A folder_id
     #   Ex: {:id => myid, :change_key => ck}
     def dispatch_folder_id!(fid)
-      if(fid[:id].is_a?(String))
+      if fid[:id].is_a? String
         folder_id!(fid[:id], fid[:change_key])
-      elsif(fid[:id].is_a?(Symbol))
+      elsif fid[:id].is_a? Symbol
         distinguished_folder_id!(fid[:id], fid[:change_key], fid[:act_as])
       else
         raise EwsBadArgumentError, "Bad argument given for a FolderId. #{fid[:id].class}"
@@ -1637,14 +1542,14 @@ module Viewpoint::EWS::SOAP
       type = iid.keys.first
       item = iid[type]
       case type
-      when :item_id
-        item_id!(item)
-      when :occurrence_item_id
-        occurrence_item_id!(item)
-      when :recurring_master_item_id
-        recurring_master_item_id!(item)
-      else
-        raise EwsBadArgumentError, "Bad ItemId type. #{type}"
+        when :item_id
+          item_id!(item)
+        when :occurrence_item_id
+          occurrence_item_id!(item)
+        when :recurring_master_item_id
+          recurring_master_item_id!(item)
+        else
+          raise EwsBadArgumentError, "Bad ItemId type. #{type}"
       end
     end
 
@@ -1655,14 +1560,14 @@ module Viewpoint::EWS::SOAP
       type = update.keys.first
       upd  = update[type]
       case type
-      when :append_to_item_field
-        append_to_item_field!(upd)
-      when :set_item_field
-        set_item_field!(upd)
-      when :delete_item_field
-        delete_item_field!(upd)
-      else
-        raise EwsBadArgumentError, "Bad Update type. #{type}"
+        when :append_to_item_field
+          append_to_item_field!(upd)
+        when :set_item_field
+          set_item_field!(upd)
+        when :delete_item_field
+          delete_item_field!(upd)
+        else
+          raise EwsBadArgumentError, "Bad Update type. #{type}"
       end
     end
 
@@ -1672,53 +1577,53 @@ module Viewpoint::EWS::SOAP
       type = uri.keys.first
       vals = uri[type].is_a?(Array) ? uri[type] : [uri[type]]
       case type.to_sym
-      when :field_uRI, :field_uri
-        vals.each do |val|
-          value = val.is_a?(Hash) ? val[type] : val
-          nbuild[ns].FieldURI('FieldURI' => value)
-        end
-      when :indexed_field_uRI, :indexed_field_uri
-        vals.each do |val|
-          nbuild[ns].IndexedFieldURI(
-            'FieldURI'   => (val[:field_uRI] || val[:field_uri]),
-            'FieldIndex' => val[:field_index]
-          )
-        end
-      when :extended_field_uRI, :extended_field_uri
-        vals.each do |val|
-          nbuild[ns].ExtendedFieldURI {
-            nbuild.parent['DistinguishedPropertySetId'] = val[:distinguished_property_set_id] if val[:distinguished_property_set_id]
-            nbuild.parent['PropertySetId'] = val[:property_set_id] if val[:property_set_id]
-            nbuild.parent['PropertyTag'] = val[:property_tag] if val[:property_tag]
-            nbuild.parent['PropertyName'] = val[:property_name] if val[:property_name]
-            nbuild.parent['PropertyId'] = val[:property_id] if val[:property_id]
-            nbuild.parent['PropertyType'] = val[:property_type] if val[:property_type]
-          }
-        end
-      else
-        raise EwsBadArgumentError, "Bad URI type. #{type}"
+        when :field_uRI, :field_uri
+          vals.each do |val|
+            value = val.is_a?(Hash) ? val[type] : val
+            nbuild[ns].FieldURI('FieldURI' => value)
+          end
+        when :indexed_field_uRI, :indexed_field_uri
+          vals.each do |val|
+            nbuild[ns].IndexedFieldURI(
+                'FieldURI'   => (val[:field_uRI] || val[:field_uri]),
+                'FieldIndex' => val[:field_index]
+            )
+          end
+        when :extended_field_uRI, :extended_field_uri
+          vals.each do |val|
+            nbuild[ns].ExtendedFieldURI {
+              nbuild.parent['DistinguishedPropertySetId'] = val[:distinguished_property_set_id] if val[:distinguished_property_set_id]
+              nbuild.parent['PropertySetId']              = val[:property_set_id] if val[:property_set_id]
+              nbuild.parent['PropertyTag']                = val[:property_tag] if val[:property_tag]
+              nbuild.parent['PropertyName']               = val[:property_name] if val[:property_name]
+              nbuild.parent['PropertyId']                 = val[:property_id] if val[:property_id]
+              nbuild.parent['PropertyType']               = val[:property_type] if val[:property_type]
+            }
+          end
+        else
+          raise EwsBadArgumentError, "Bad URI type. #{type}"
       end
     end
 
     # Insert item, enforce xmlns attribute if prefix is present
     def dispatch_field_item!(item, ns_prefix = nil)
       item.values.first[:xmlns_attribute] = ns_prefix if ns_prefix
-      type = item.keys.first
-      val = item[type]
+      type                                = item.keys.first
+      val                                 = item[type]
       case type.to_sym
-      when :item
-      when :message
-      when :calendar_item
-      when :contact
-        contact!(val)
-      when :distribution_list
-      when :meeting_message
-      when :meeting_request
-      when :meeting_response
-      when :meeting_cancellation
-      when :task
-      else
-        raise EwsBadArgumentError, "Bad SetItemField element. #{type}"
+        when :item
+        when :message
+        when :calendar_item
+        when :contact
+          contact!(val)
+        when :distribution_list
+        when :meeting_message
+        when :meeting_request
+        when :meeting_response
+        when :meeting_cancellation
+        when :task
+        else
+          raise EwsBadArgumentError, "Bad SetItemField element. #{type}"
       end
     end
 
@@ -1733,29 +1638,29 @@ module Viewpoint::EWS::SOAP
     end
 
 
-private
+    private
 
     def parent_namespace(node)
-      node.parent.namespace_definitions.find {|ns| ns.prefix == NS_SOAP}
+      node.parent.namespace_definitions.find { |ns| ns.prefix == NS_SOAP }
     end
 
     def set_version_header!(version)
       if version && !(version == 'none')
-        nbuild[NS_EWS_TYPES].RequestServerVersion {|x|
+        nbuild[NS_EWS_TYPES].RequestServerVersion { |x|
           x.parent['Version'] = version
         }
       end
     end
 
     def set_impersonation!(type, address)
-	    if type && type != ""
-	      nbuild[NS_EWS_TYPES].ExchangeImpersonation {
-		      nbuild[NS_EWS_TYPES].ConnectingSID {
-		        nbuild[NS_EWS_TYPES].method_missing type, address
-		      }
+      if type && type != ''
+        nbuild[NS_EWS_TYPES].ExchangeImpersonation {
+          nbuild[NS_EWS_TYPES].ConnectingSID {
+            nbuild[NS_EWS_TYPES].method_missing type, address
+          }
         }
       end
-	  end
+    end
 
     # Set TimeZoneContext Header
     # @param time_zone_def [Hash] !{id: time_zone_identifier, name: time_zone_name}
@@ -1777,25 +1682,25 @@ private
     # some methods need special naming so they use the '_r' suffix like 'and'
     def normalize_type(type)
       case type
-      when :and, :or, :not
-        "#{type}_r".to_sym
-      else
-        type
+        when :and, :or, :not
+          "#{type}_r".to_sym
+        else
+          type
       end
     end
 
     def format_time(time)
       case time
-      when Time, Date, DateTime
-        time.to_datetime.new_offset(0).iso8601
-      when String
-        begin
-          DateTime.parse(time).new_offset(0).iso8601
-        rescue ArgumentError
+        when Time, Date, DateTime
+          time.to_datetime.new_offset(0).iso8601
+        when String
+          begin
+            DateTime.parse(time).new_offset(0).iso8601
+          rescue ArgumentError
+            raise EwsBadArgumentError, "Invalid Time argument (#{time})"
+          end
+        else
           raise EwsBadArgumentError, "Invalid Time argument (#{time})"
-        end
-      else
-        raise EwsBadArgumentError, "Invalid Time argument (#{time})"
       end
     end
 
