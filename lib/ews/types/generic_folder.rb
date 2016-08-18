@@ -89,7 +89,9 @@ module Viewpoint::EWS::Types
         root_folder = resp.response_messages[0].root_folder
         items       = items_parser resp
         if block_given?
-          yield items
+          items.each do |item|
+            yield item
+          end
         else
           all_items += items
         end
