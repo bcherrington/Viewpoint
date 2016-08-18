@@ -26,25 +26,25 @@ module Viewpoint::EWS::Types
     include Viewpoint::StringUtils
 
     GFOLDER_KEY_PATHS = {
-      :folder_id        => [:folder_id,],
-      :id               => [:folder_id, :id],
-      :change_key       => [:folder_id, :change_key],
-      :parent_folder_id => [:parent_folder_id, :id],
-      :parent_folder_change_key => [:parent_folder_id, :change_key],
-      :folder_class     => [:folder_class, :text],
-      :total_count      => [:total_count, :text],
-      :child_folder_count => [:child_folder_count, :text],
-      :display_name     => [:display_name, :text],
+        folder_id:                [:folder_id,],
+        id:                       [:folder_id, :id],
+        change_key:               [:folder_id, :change_key],
+        parent_folder_id:         [:parent_folder_id, :id],
+        parent_folder_change_key: [:parent_folder_id, :change_key],
+        folder_class:             [:folder_class, :text],
+        total_count:              [:total_count, :text],
+        child_folder_count:       [:child_folder_count, :text],
+        display_name:             [:display_name, :text],
     }
 
     GFOLDER_KEY_TYPES = {
-      :total_count        => ->(str){str.to_i},
-      :child_folder_count => ->(str){str.to_i},
+        total_count:        ->(str) { str.to_i },
+        child_folder_count: ->(str) { str.to_i },
     }
 
     GFOLDER_KEY_ALIAS = {
-      :name   => :display_name,
-      :ckey   => :change_key,
+        name: :display_name,
+        ckey: :change_key,
     }
 
     attr_accessor :subscription_id, :watermark, :sync_state
@@ -55,13 +55,13 @@ module Viewpoint::EWS::Types
       super
       # simplify!
       @sync_state = nil
-      @synced = false
+      @synced     = false
     end
 
     def delete!
       opts = {
-        :folder_ids   => [:id => id],
-        :delete_type  => 'HardDelete'
+          folder_ids:  [:id => id],
+          delete_type: 'HardDelete'
       }
       resp = @ews.delete_folder(opts)
       if resp.success?
@@ -73,11 +73,29 @@ module Viewpoint::EWS::Types
 
     def items(opts = {})
       args = items_args(opts.clone)
-      obj = OpenStruct.new(opts: args, restriction: {})
+      obj  = OpenStruct.new(opts: args, restriction: {})
       yield obj if block_given?
       merge_restrictions! obj
       resp = ews.find_item(args)
       items_parser resp
+    end
+
+    def items_paged(page_size, offset = 0, opts = {})
+      args      = items_args(opts.clone)
+      all_items = []
+      begin
+        paging      = { indexed_page_item_view: { max_entries_returned: page_size, base_point: 'Beginning', offset: offset } }
+        resp        = ews.find_item(args.merge(paging))
+        root_folder = resp.response_messages[0].root_folder
+        items       = items_parser resp
+        if block_given?
+          yield items
+        else
+          all_items += items
+        end
+        offset += root_folder.total_items_in_view.to_i
+      end until root_folder.includes_last_item_in_range && root_folder.includes_last_item_in_range == true
+      all_items if block_given?
     end
 
     # Fetch items since a give DateTime
@@ -85,14 +103,13 @@ module Viewpoint::EWS::Types
     def items_since(date_time, opts = {})
       opts = opts.clone
       unless date_time.kind_of?(Date)
-        raise EwsBadArgumentError, "First argument must be a Date or DateTime"
+        raise EwsBadArgumentError, 'First argument must be a Date or DateTime'
       end
-      restr = {:restriction =>
-        {:is_greater_than_or_equal_to =>
-          [{:field_uRI => {:field_uRI=>'item:DateTimeReceived'}},
-            {:field_uRI_or_constant =>{:constant => {:value=>date_time.to_datetime}}}]
-        }}
-        items(opts.merge(restr))
+      restr = { restriction: { is_greater_than_or_equal_to:
+                                   [{ field_uRI: { field_uRI: 'item:DateTimeReceived' } },
+                                    { field_uRI_or_constant: { constant: { value: date_time.to_datetime } } }]
+      } }
+      items(opts.merge(restr))
     end
 
     # Fetch only items from today (since midnight)
@@ -105,21 +122,18 @@ module Viewpoint::EWS::Types
     # @param [DateTime] end_date the time to stop fetching Items from
     def items_between(start_date, end_date, opts={})
       items do |obj|
-        obj.restriction = { :and =>
-          [
-            {:is_greater_than_or_equal_to =>
-              [
-                {:field_uRI => {:field_uRI=>'item:DateTimeReceived'}},
-                {:field_uRI_or_constant=>{:constant => {:value =>start_date}}}
-              ]
-            },
-            {:is_less_than_or_equal_to =>
-              [
-                {:field_uRI => {:field_uRI=>'item:DateTimeReceived'}},
-                {:field_uRI_or_constant=>{:constant => {:value =>end_date}}}
-              ]
-            }
-          ]
+        obj.restriction = { and: [
+                                     { is_greater_than_or_equal_to: [
+                                                                        { field_uRI: { field_uRI: 'item:DateTimeReceived' } },
+                                                                        { field_uRI_or_constant: { constant: { value: start_date } } }
+                                                                    ]
+                                     },
+                                     { is_less_than_or_equal_to: [
+                                                                     { field_uRI: { field_uRI: 'item:DateTimeReceived' } },
+                                                                     { field_uRI_or_constant: { constant: { value: end_date } } }
+                                                                 ]
+                                     }
+                                 ]
         }
       end
     end
@@ -131,23 +145,22 @@ module Viewpoint::EWS::Types
     #   the subject.  This is optional.
     def search_by_subject(match_str, exclude_str = nil)
       items do |obj|
-        match = {:contains => {
-          :containment_mode => 'Substring',
-          :containment_comparison => 'IgnoreCase',
-          :field_uRI => {:field_uRI=>'item:Subject'},
-          :constant => {:value =>match_str}
-        }}
+        match = { contains: {
+            containment_mode:       'Substring',
+            containment_comparison: 'IgnoreCase',
+            field_uRI:              { field_uRI: 'item:Subject' },
+            constant:               { value: match_str }
+        } }
         unless exclude_str.nil?
-          excl = {:not =>
-            {:contains => {
-              :containment_mode => 'Substring',
-              :containment_comparison => 'IgnoreCase',
-              :field_uRI => {:field_uRI=>'item:Subject'},
-              :constant => {:value =>exclude_str}
-            }}
+          excl = { not: { contains: {
+              containment_mode:       'Substring',
+              containment_comparison: 'IgnoreCase',
+              field_uRI:              { field_uRI: 'item:Subject' },
+              constant:               { value: exclude_str }
+          } }
           }
 
-          match[:and] = [{:contains => match.delete(:contains)}, excl]
+          match[:and] = [{ contains: match.delete(:contains) }, excl]
         end
         obj.restriction = match
       end
@@ -160,11 +173,11 @@ module Viewpoint::EWS::Types
 
     def available_categories
       opts = {
-        user_config_name: {
-          name: 'CategoryList',
-          distinguished_folder_id: {id: :calendar}
-        },
-        user_config_props: 'XmlData'
+          user_config_name:  {
+              name:                    'CategoryList',
+              distinguished_folder_id: { id: :calendar }
+          },
+          user_config_props: 'XmlData'
       }
       resp = ews.get_user_configuration(opts)
       #txt = resp.response_message[:get_user_configuration_response_message][:user_configuration][:xml_data][:text]
@@ -184,19 +197,19 @@ module Viewpoint::EWS::Types
     #   :change_key is returned.
     #   See: http://msdn.microsoft.com/en-us/library/aa565609.aspx
     def sync_items!(sync_state = nil, sync_amount = 256, sync_all = false, opts = {})
-      item_shape = opts.has_key?(:item_shape) ? opts.delete(:item_shape) : {:base_shape => :default}
+      item_shape = opts.has_key?(:item_shape) ? opts.delete(:item_shape) : { base_shape: :default }
       sync_state ||= @sync_state
 
-      resp = ews.sync_folder_items item_shape: item_shape,
-        sync_folder_id: self.folder_id, max_changes_returned: sync_amount, sync_state: sync_state
+      resp = ews.sync_folder_items item_shape:     item_shape,
+                                   sync_folder_id: self.folder_id, max_changes_returned: sync_amount, sync_state: sync_state
       rmsg = resp.response_messages
 
       if rmsg.success?
-        @synced = rmsg.includes_last_item_in_range?
+        @synced     = rmsg.includes_last_item_in_range?
         @sync_state = rmsg.sync_state
-        rhash = {}
+        rhash       = {}
         rmsg.changes.each do |c|
-          ctype = c.keys.first
+          ctype        = c.keys.first
           rhash[ctype] = [] unless rhash.has_key?(ctype)
           if ctype == :delete || ctype == :read_flag_change
             rhash[ctype] << c[ctype][:item_id]
@@ -227,17 +240,17 @@ module Viewpoint::EWS::Types
     # @param timeout [Fixnum] the time in minutes that the subscription can
     #   remain idle between calls to #get_events. default: 240 minutes
     # @return [Boolean] Did the subscription happen successfully?
-    def subscribe(evtypes = [:all], watermark = nil, timeout = 240)
+    def subscribe(event_types = [:all], watermark = nil, timeout = 240)
       # Refresh the subscription if already subscribed
       unsubscribe if subscribed?
 
-      event_types = normalize_event_names(evtypes)
-      folder = {id: self.id, change_key: self.change_key}
-      resp = ews.pull_subscribe_folder(folder, event_types, timeout, watermark)
-      rmsg = resp.response_messages.first
+      event_types = normalize_event_names(event_types)
+      folder      = { id: self.id, change_key: self.change_key }
+      resp        = ews.pull_subscribe_folder(folder, event_types, timeout, watermark)
+      rmsg        = resp.response_messages.first
       if rmsg.success?
         @subscription_id = rmsg.subscription_id
-        @watermark = rmsg.watermark
+        @watermark       = rmsg.watermark
         true
       else
         raise EwsSubscriptionError, "Could not subscribe: #{rmsg.code}: #{rmsg.message_text}"
@@ -247,12 +260,12 @@ module Viewpoint::EWS::Types
     def push_subscribe(url, evtypes = [:all], watermark = nil, status_frequency = nil)
 
       event_types = normalize_event_names(evtypes)
-      folder = {id: self.id, change_key: self.change_key}
-      resp = ews.push_subscribe_folder(folder, event_types, url, status_frequency, watermark)
-      rmsg = resp.response_messages.first
+      folder      = { id: self.id, change_key: self.change_key }
+      resp        = ews.push_subscribe_folder(folder, event_types, url, status_frequency, watermark)
+      rmsg        = resp.response_messages.first
       if rmsg.success?
         @subscription_id = rmsg.subscription_id
-        @watermark = rmsg.watermark
+        @watermark       = rmsg.watermark
         true
       else
         raise EwsSubscriptionError, "Could not subscribe: #{rmsg.code}: #{rmsg.message_text}"
@@ -262,7 +275,7 @@ module Viewpoint::EWS::Types
     # Check if there is a subscription for this folder.
     # @return [Boolean] Are we subscribed to this folder?
     def subscribed?
-      ( @subscription_id.nil? or @watermark.nil? )? false : true
+      (@subscription_id.nil? or @watermark.nil?) ? false : true
     end
 
     # Unsubscribe this folder from further Exchange events.
@@ -285,11 +298,11 @@ module Viewpoint::EWS::Types
     def get_events
       begin
         if subscribed?
-          resp = ews.get_events(@subscription_id, @watermark)
-          rmsg = resp.response_messages
+          resp       = ews.get_events(@subscription_id, @watermark)
+          rmsg       = resp.response_messages
           @watermark = rmsg.new_watermark
           # @todo if parms[:more_events] # get more events
-          rmsg.events.collect{|ev|
+          rmsg.events.collect { |ev|
             type = ev.keys.first
             class_by_name(type).new(ews, ev[type])
           }
@@ -319,7 +332,7 @@ module Viewpoint::EWS::Types
     end
 
     def simplify!
-      @ews_item = @ews_item.inject({}) do |o,i|
+      @ews_item = @ews_item.inject({}) do |o, i|
         key = i.keys.first
         if o.has_key?(key)
           if o[key].is_a?(Array)
@@ -345,19 +358,19 @@ module Viewpoint::EWS::Types
       get_folder_parser(resp)
     end
 
-    # Build up the arguements for #get_folder
+    # Build up the arguments for #get_folder
     # @todo: should we really pass the ChangeKey or do we want the freshest obj?
     def get_folder_args(opts)
       opts[:base_shape] ||= 'Default'
-      default_args = {
-        :folder_ids   => [{:id => self.id, :change_key => self.change_key}],
-        :folder_shape => {:base_shape => opts[:base_shape]}
+      default_args      = {
+          folder_ids:   [{ id: self.id, change_key: self.change_key }],
+          folder_shape: { base_shape: opts[:base_shape] }
       }
       default_args.merge(opts)
     end
 
     def get_folder_parser(resp)
-      if(resp.status == 'Success')
+      if resp.status == 'Success'
         f = resp.response_message[:folders]
         f.values.first
       else
@@ -366,16 +379,16 @@ module Viewpoint::EWS::Types
     end
 
     def items_args(opts)
-      default_args = {
-        :parent_folder_ids => [{:id => self.id}],
-        :traversal => 'Shallow',
-        :item_shape  => {:base_shape => 'Default'}
+      {
+          parent_folder_ids: [{ id: self.id }],
+          traversal:         'Shallow',
+          item_shape:        { base_shape: 'Default' }
       }.merge(opts)
     end
 
     def items_parser(resp)
       rm = resp.response_messages[0]
-      if(rm.status == 'Success')
+      if rm.status == 'Success'
         # items = FolderView.new(rm.root_folder)
         items = []
         if rm.root_folder.items.is_a? Array
@@ -396,10 +409,10 @@ module Viewpoint::EWS::Types
     def merge_restrictions!(obj, merge_type = :and)
       if obj.opts[:restriction] && !obj.opts[:restriction].empty? && !obj.restriction.empty?
         obj.opts[:restriction] = {
-          merge_type => [
-            obj.opts.delete(:restriction),
-            obj.restriction
-        ]
+            merge_type => [
+                obj.opts.delete(:restriction),
+                obj.restriction
+            ]
         }
       elsif !obj.restriction.empty?
         obj.opts[:restriction] = obj.restriction
