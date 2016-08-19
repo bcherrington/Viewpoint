@@ -82,6 +82,8 @@ module Viewpoint::EWS::Types
 
     def items_paged(page_size, offset = 0, opts = {})
       args      = items_args(opts.clone)
+      obj       = OpenStruct.new(opts: args, restriction: {})
+      merge_restrictions! obj
       all_items = []
       begin
         paging      = { indexed_page_item_view: { max_entries_returned: page_size, base_point: 'Beginning', offset: offset } }
@@ -96,8 +98,8 @@ module Viewpoint::EWS::Types
           all_items += items
         end
         offset += root_folder.total_items_in_view.to_i
-      end until root_folder.includes_last_item_in_range && root_folder.includes_last_item_in_range == true
-      all_items if block_given?
+      end until root_folder.includes_last_item_in_range && root_folder.includes_last_item_in_range == 'true'
+      all_items unless block_given?
     end
 
     # Fetch items since a give DateTime
