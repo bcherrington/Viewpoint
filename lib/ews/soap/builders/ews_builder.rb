@@ -1112,11 +1112,11 @@ module Viewpoint::EWS::SOAP
 
     def physicaladdress!(p)
       nbuild[NS_EWS_TYPES].Entry('Key' => p[:key]) {
-        nbuild[NS_EWS_TYPES].Street(p[:street][:text])  if p.key? :street
-        nbuild[NS_EWS_TYPES].City(p[:city][:text]) if p.key? :city
-        nbuild[NS_EWS_TYPES].State(p[:state][:text])  if p.key? :state
-        nbuild[NS_EWS_TYPES].CountryOrRegion(p[:country_or_region][:text])  if p.key? :country_or_region
-        nbuild[NS_EWS_TYPES].PostalCode(p[:postal_code][:text]) if p.key? :postal_code
+        nbuild[NS_EWS_TYPES].Street(p.key?(:street) ? p[:street][:text] : '')
+        nbuild[NS_EWS_TYPES].City(p.key?(:city) ? p[:city][:text] : '')
+        nbuild[NS_EWS_TYPES].State(p.key?(:state) ? p[:state][:text] : '')
+        nbuild[NS_EWS_TYPES].CountryOrRegion(p.key?(:country_or_region) ? p[:country_or_region][:text] : '')
+        nbuild[NS_EWS_TYPES].PostalCode(p.key?(:postal_code) ? p[:postal_code][:text] : '')
       }
     end
 
