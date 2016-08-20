@@ -19,7 +19,7 @@ module Viewpoint::EWS::SOAP
 
   # This class includes the element builders. The idea is that each element should
   # know how to build themselves so each parent element can delegate creation of
-  # subelements to a method of the same name with a '!' after it.
+  # sub-elements to a method of the same name with a '!' after it.
   class EwsBuilder
     include Viewpoint::EWS
     include Viewpoint::StringUtils
@@ -49,7 +49,7 @@ module Viewpoint::EWS::SOAP
       end
     end
 
-    # Build the SOAP envelope and yield this object so subelements can be built. Once
+    # Build the SOAP envelope and yield this object so sub-elements can be built. Once
     # you have the EwsBuilder object you can use the nbuild object like shown in the
     # example for the Header section. The nbuild object is the underlying
     # Nokogiri::XML::Builder object.
@@ -1103,20 +1103,20 @@ module Viewpoint::EWS::SOAP
     def physical_addresses!(p)
       nbuild[NS_EWS_TYPES].PhysicalAddresses {
         if p.is_a?(Hash)
-          physicaladdress!(p[:entry])
+          physical_address!(p[:entry])
         else
-          p.each { |address| physicaladdress!(address[:entry]) }
+          p.each { |address| physical_address!(address[:entry]) }
         end
       }
     end
 
-    def physicaladdress!(p)
+    def physical_address!(p)
       nbuild[NS_EWS_TYPES].Entry('Key' => p[:key]) {
-        nbuild[NS_EWS_TYPES].Street(p.key?(:street) ? p[:street][:text] : '')
-        nbuild[NS_EWS_TYPES].City(p.key?(:city) ? p[:city][:text] : '')
-        nbuild[NS_EWS_TYPES].State(p.key?(:state) ? p[:state][:text] : '')
-        nbuild[NS_EWS_TYPES].CountryOrRegion(p.key?(:country_or_region) ? p[:country_or_region][:text] : '')
-        nbuild[NS_EWS_TYPES].PostalCode(p.key?(:postal_code) ? p[:postal_code][:text] : '')
+        nbuild[NS_EWS_TYPES].Street(p[:street][:text]) if p.key?(:street)
+        nbuild[NS_EWS_TYPES].City(p[:city][:text]) if p.key?(:city)
+        nbuild[NS_EWS_TYPES].State(p[:state][:text]) if p.key?(:state)
+        nbuild[NS_EWS_TYPES].CountryOrRegion(p[:country_or_region][:text]) if p.key?(:country_or_region)
+        nbuild[NS_EWS_TYPES].PostalCode(p[:postal_code][:text]) if p.key?(:postal_code)
       }
     end
 
@@ -1125,14 +1125,14 @@ module Viewpoint::EWS::SOAP
     def phone_numbers!(p)
       nbuild[NS_EWS_TYPES].PhoneNumbers {
         if p.is_a?(Hash)
-          phonenumbers!(p[:entry])
+          phone_number!(p[:entry])
         else
-          p.each { |phone| phonenumbers!(phone[:entry]) }
+          p.each { |phone| phone_number!(phone[:entry]) }
         end
       }
     end
 
-    def phonenumbers!(p)
+    def phone_number!(p)
       nbuild[NS_EWS_TYPES].Entry('Key' => p[:key]) {
         nbuild.text(p[:text])
       }
