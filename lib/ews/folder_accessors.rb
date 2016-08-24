@@ -19,9 +19,11 @@ module Viewpoint::EWS::FolderAccessors
   include Viewpoint::EWS
 
   FOLDER_TYPE_MAP = {
-    :mail     => 'IPF.Note',
-    :calendar => 'IPF.Appointment',
-    :task     => 'IPF.Task',
+      mail:     'IPF.Note',
+      calendar: 'IPF.Appointment',
+      task:     'IPF.Task',
+      contact:  'IPF.Contact',
+      search:   'IPF.Note'
   }
 
   # Find subfolders of the passed root folder.  If no parameters are passed this
@@ -39,12 +41,13 @@ module Viewpoint::EWS::FolderAccessors
   def folders(opts={})
     opts = opts.clone
     args = find_folders_args(opts)
-    obj = OpenStruct.new(opts: args, restriction: {})
+    obj  = OpenStruct.new(opts: args, restriction: {})
     yield obj if block_given?
     merge_restrictions! obj
-    resp = ews.find_folder( args )
+    resp = ews.find_folder(args)
     find_folders_parser(resp)
   end
+
   alias :find_folders :folders
 
   # Get a specific folder by id or symbol
@@ -73,15 +76,14 @@ module Viewpoint::EWS::FolderAccessors
   #   have been given delegate access to the folder or this operation will fail.
   # @raise [EwsError] raised when the backend SOAP method returns an error.
   def get_folder_by_name(name, opts={})
-    opts = opts.clone
+    opts        = opts.clone
     opts[:root] = opts.delete(:parent)
     folders(opts) do |obj|
       obj.restriction = {
-        :is_equal_to =>
-        [
-          {:field_uRI => {:field_uRI=>'folder:DisplayName'}},
-          {:field_uRI_or_constant => {:constant => {:value=>name}}}
-        ]
+          is_equal_to: [
+                           { field_uRI: { field_uRI: 'folder:DisplayName' } },
+                           { field_uRI_or_constant: { constant: { value: name } } }
+                       ]
       }
     end.first
   end
@@ -94,14 +96,15 @@ module Viewpoint::EWS::FolderAccessors
   #   :folder, :calendar, :contacts, :search, or :tasks
   # @see http://msdn.microsoft.com/en-us/library/aa580808.aspx
   def make_folder(name, opts={})
-    parent = opts[:parent] || :msgfolderroot
-    pid = {}
-    pid[:id] = parent
+    parent       = opts[:parent] || :msgfolderroot
+    pid          = {}
+    pid[:id]     = parent
     pid[:act_as] = opts[:act_as] if opts.key?(:act_as)
-    resp = ews.create_folder parent_folder_id: pid,
-      :folders => [folder_type(opts[:type]) => {:display_name => {text: name}}]
+    resp         = ews.create_folder parent_folder_id: pid,
+                                     :folders          => [folder_type(opts[:type]) => { display_name: { text: name } }]
     create_folder_parser(resp).first
   end
+
   alias :mkfolder :make_folder
 
   # Get a specific folder by id or symbol
@@ -125,33 +128,32 @@ module Viewpoint::EWS::FolderAccessors
     opts = opts.clone
     args = sync_folders_args(opts)
     yield args if block_given?
-    resp = ews.sync_folder_hierarchy( args )
+    resp = ews.sync_folder_hierarchy(args)
     sync_folders_parser(resp)
   end
 
 
-private
+  private
 
   # Build up the arguements for #find_folders
   def find_folders_args(opts)
-    opts[:root] = opts[:root] || :msgfolderroot
-    opts[:traversal] = opts[:traversal] || :shallow
-    opts[:shape] = opts[:shape] || :default
-    folder_id = {:id => opts[:root]}
+    opts[:root]        = opts[:root] || :msgfolderroot
+    opts[:traversal]   = opts[:traversal] || :shallow
+    opts[:shape]       = opts[:shape] || :default
+    folder_id          = { id: opts[:root] }
     folder_id[:act_as] = opts[:act_as] if opts[:act_as]
-    if( opts[:folder_type] )
-      restr = { :is_equal_to =>
-        [
-          {:field_uRI => {:field_uRI=>'folder:FolderClass'}},
-          {:field_uRI_or_constant=>{:constant =>
-            {:value => map_folder_type(opts[:folder_type])}}},
-        ]
+    restr              = nil
+    if opts[:folder_type]
+      restr = { is_equal_to: [
+                                 { field_uRI: { field_uRI: 'folder:FolderClass' } },
+                                 { field_uRI_or_constant: { constant: { value: map_folder_type(opts[:folder_type]) } } },
+                             ]
       }
     end
-    args = {
-      :parent_folder_ids => [folder_id],
-      :traversal => opts[:traversal],
-      :folder_shape => {:base_shape => opts[:shape]}
+    args               = {
+        parent_folder_ids: [folder_id],
+        traversal:         opts[:traversal],
+        folder_shape:      { base_shape: opts[:shape] }
     }
     args[:restriction] = restr if restr
     args
@@ -184,21 +186,21 @@ private
   # Build up the arguements for #get_folder
   def get_folder_args(folder_id, opts)
     opts[:shape] ||= :default
-    default_args =  {
-      :folder_shape => {:base_shape => opts[:shape]}
+    default_args = {
+        folder_shape: { base_shape: opts[:shape] }
     }
     if folder_id.is_a?(Hash)
       default_args[:folder_ids] = [folder_id]
     else
-      default_args[:folder_ids] = [{:id => folder_id}]
+      default_args[:folder_ids] = [{ id: folder_id }]
     end
     default_args.merge opts
   end
 
   # @param [Viewpoint::EWS::SOAP::EwsSoapResponse] resp
   def get_folder_parser(resp)
-    if(resp.status == 'Success')
-      f = resp.response_message[:folders]
+    if resp.status == 'Success'
+      f     = resp.response_message[:folders]
       ftype = f.keys.first
       class_by_name(ftype).new(ews, f[ftype])
     else
@@ -208,13 +210,13 @@ private
 
   def sync_folders_args(opts)
     opts[:shape] = opts[:shape] || :default
-    args = { :folder_shape => {:base_shape => opts[:shape]} }
+    args         = { folder_shape: { base_shape: opts[:shape] } }
     if opts[:folder_id]
       folder_id = opts[:folder_id]
       if folder_id.is_a?(Hash)
         args[:sync_folder_id] = folder_id
       else
-        args[:sync_folder_id] = {:id => folder_id}
+        args[:sync_folder_id] = { id: folder_id }
       end
     end
     args[:sync_state] = opts[:sync_state] if opts[:sync_state]
@@ -224,11 +226,11 @@ private
   def sync_folders_parser(resp)
     rmsg = resp.response_messages[0]
     if rmsg.success?
-      rhash = {}
+      rhash              = {}
       rhash[:all_synced] = rmsg.includes_last_folder_in_range?
       rhash[:sync_state] = rmsg.sync_state
       rmsg.changes.each do |c|
-        ctype = c.keys.first
+        ctype        = c.keys.first
         rhash[ctype] = [] unless rhash.has_key?(ctype)
         if ctype == :delete
           rhash[ctype] << c[ctype][:folder_id]
@@ -253,12 +255,12 @@ private
 
   def folder_type(type)
     case type
-    when nil, :folder
-      :folder
-    when :calendar, :contacts, :search, :tasks
-      "#{type}_folder".to_sym
-    else
-      raise EwsBadArgumentError, "Not a proper folder type: :#{type}"
+      when nil, :folder
+        :folder
+      when :calendar, :contacts, :search, :tasks
+        "#{type}_folder".to_sym
+      else
+        raise EwsBadArgumentError, "Not a proper folder type: :#{type}"
     end
   end
 
