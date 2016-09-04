@@ -162,11 +162,13 @@ module Viewpoint::EWS::FolderAccessors
   # @param [Viewpoint::EWS::SOAP::EwsSoapResponse] resp
   def find_folders_parser(resp)
     if resp.status == 'Success'
-      folders = resp.response_message[:root_folder][:folders]
-      return [] if folders.nil?
-      folders.collect do |ftype, data|
-        class_by_name(ftype).new(ews, data)
+      rm = resp.response_message[:root_folder][:folders]
+      folders = []
+      rm.each do |f|
+        type = f.keys.first
+        folders << class_by_name(type).new(ews, f[type])
       end
+      folders
     else
       raise EwsFolderNotFound, "Could not retrieve folders. #{resp.code}: #{resp.message}"
     end
@@ -174,10 +176,13 @@ module Viewpoint::EWS::FolderAccessors
 
   def create_folder_parser(resp)
     if resp.status == 'Success'
-      folders = resp.response_message[:folders]
-      folders.collect do |ftype, data|
-        class_by_name(ftype).new(ews, data)
+      rm = resp.response_message[:folders]
+      folders = []
+      rm.each do |f|
+        type = f.keys.first
+        folders << class_by_name(type).new(ews, f[type])
       end
+      folders
     else
       raise EwsError, "Could not create folder. #{resp.code}: #{resp.message}"
     end
